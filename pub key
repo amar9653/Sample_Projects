@@ -1,1 +1,110 @@
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDUHzMY0Z1txRb1nHVqDF7Gj5U2ryJB/ITxD/78HcoH darkvirus@darkvirus
+
+SAST (Static Application Security Testing)
+SCA (Software Composition Analysis)
+
+apt update -y
+apt install openjdk-17-jdk -y
+java -version
+cd /opt
+wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-9.9.8.100196.zip
+apt install unzip -y 
+unzip sonarqube-9.9.8.100196.zip
+chown -R ubuntu:ubuntu sonarqube-9.9.8.100196
+cd sonarqube-9.9.8.100196/bin/linux-x86-64/
+sudo -u ubuntu ./sonar.sh start
+sudo -u ubuntu ./sonar.sh status
+IP:9000
+admin/admin
+sonarqube scanner plugin on jenkins
+create Authentication token on sonarqube (sonar-token) sqa_ac8384d742cd38e6d7170fa4de96549a2b36218f and add on jenkins
+Integrate sonarqube with jenkins (under manage jenkins --> systems) give name sonar-9, URL and token
+
+code can be forked from here --> https://github.com/asecurityguru/devsecops-jenkins-k8s-tf-sast-sonarcloud-repo
+
+
+pipeline {
+    agent any
+
+    stages {
+
+        stage("Checkout the Project") {
+            steps {
+                git 'https://github.com/jsachdev07/devsecops-jenkins-sast-sonarcloud-repo.git'
+            }
+        }
+
+        stage("Build the package") {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage("Sonar Quality Check") {
+            steps {
+                script {
+                    withSonarQubeEnv(installationName: 'sonar-9', credentialsId: 'sonar-token') {
+                        sh 'mvn sonar:sonar'
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+Purpose of mvn sonar:sonar
+This command runs SonarQube analysis on your Maven project.It uses the SonarQube Maven plugin to:
+
+- Scan your code
+- Analyze metrics like code quality, bugs, vulnerabilities, code smells, coverage, duplications, etc.
+
+Send the analysis results to a SonarQube server
+
+
+
+
+If using SonarQube Cloud (SaaS)
+
+mvn clean verify sonar:sonar \
+  -Dsonar.projectKey=my-project \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.login=your_token
+  
+ 
+
+
+pipeline {
+    agent any
+    stages {
+        stage("Checkout the Project") {
+            steps {
+                git branch: 'main', url: 'https://github.com/jsachdev07/devsecops-jenkins-sast-sca-sonarcloud-snyk-repo.git'
+            }
+        }
+
+        stage("Build the package") {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage("Sonar Quality Check") {
+            steps {
+                script {
+                    withSonarQubeEnv(installationName: 'sonar-9', credentialsId: 'sonar-token') {
+                        sh 'mvn sonar:sonar'
+                    }
+                }
+            }
+		}
+
+        stage('RunSCAAnalysisUsingSnyk') {
+            steps {
+                withCredentials([string(credentialsId: 'SNYK_TOKEN', variable: 'SNYK_TOKEN')]) {
+                    sh 'mvn snyk:test -fn'
+                }
+            }
+        }
+    }
+}
